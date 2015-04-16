@@ -117,7 +117,8 @@ class ASTToGSpanConverter():
 
         #defining edges
         for l1, l1_id, l1_label, l2, l2_id, l2_label in self.link_list:
-            self.gspan_text_file += "e " + str(vertex_dict[l1_id][2][1:]) + " " + str(vertex_dict[l2_id][2][1:]) + " 0" + "\n"
+            self.gspan_text_file += "e " + str(vertex_dict[l1_id][2][1:]) + " " + str(vertex_dict[l2_id][2][1:]) + \
+                                    " 0" + "\n"
 
         self.vertex_dict = vertex_dict
 
@@ -128,7 +129,8 @@ class ASTToGSpanConverter():
         return self.vertex_dict
 
 class MakeGSpanInputFile():
-    "input is a folder containing .py codes, for each it builds simplified AST tree, transforms it to gSpan representation"
+    """input is a folder containing .py codes, for each it builds simplified AST tree,
+    transforms it to gSpan representation"""
     def __init__(self, py_folder):
         self.py_folder = py_folder
         self.list_of_correct_solutions = list()
