@@ -1,4 +1,4 @@
-import ast, os
+import ast, os, sys
 from tkinter import *
 from subprocess import *
 
@@ -136,8 +136,9 @@ class MakeGSpanInputFile():
         self.list_of_correct_solutions = list()
         self.list_of_wrong_solutions = list()
         self.gspan_text_file = ""
+        self.dict_of_labels = dict()
 
-    def make_gspan_input_file(self):
+    def make_gspan_input_file(self, file_name):
         f = FileHandler(self.py_folder)
         list_of_python_codes = f.get_list_of_python_code()
         graph_number = 0
@@ -147,9 +148,10 @@ class MakeGSpanInputFile():
         function_dict = {"If":1, "For":2, "While":3, "Return":4}
 
         for i, code in enumerate(list_of_python_codes):
-            print("NEW FILE")
 
-            self.gspan_text_file += "t # " + str(i)
+            gspan_code_text = ""
+
+            self.gspan_text_file += "t # " + str(i) + "\n"
 
             #checks if code is correct or wrong
             for line in code.split("\n"):
@@ -158,6 +160,7 @@ class MakeGSpanInputFile():
                     self.list_of_correct_solutions.append(graph_number)
                 else:
                     self.list_of_wrong_solutions.append(graph_number)
+                graph_number += 1
                 break
 
             list_of_links = PyToASTConverter(code).get_link_list()
@@ -170,11 +173,8 @@ class MakeGSpanInputFile():
                 vertex_dict[l1_id] = [l1, l1_label]
                 vertex_dict[l2_id] = [l2, l2_label]
 
-            print("VERTEX DICT", vertex_dict)
-
             #setting the vertex labels
             for key in vertex_dict.keys():
-
 
                 if vertex_dict[key][1] == 0 or vertex_dict[key][1] == 5:
 
@@ -184,8 +184,6 @@ class MakeGSpanInputFile():
 
                 vertex_dict[key].append("v" + str(vertex_number))
                 gspan_code_text += "v " + str(vertex_number) + " " + str(function_dict[vertex_dict[key][0]]) +"\n"
-
-                #self.gspan_text_file += "v " + str(vertex_number) + " " + "0" + "\n"
                 vertex_number += 1
 
             #edges
@@ -193,15 +191,22 @@ class MakeGSpanInputFile():
                 gspan_code_text += "e " + str(vertex_dict[l1_id][2][1:]) + " " + str(vertex_dict[l2_id][2][1:]) + " 0" + "\n"
 
             self.gspan_text_file += gspan_code_text
-            print("gspan text", gspan_code_text)
-            print("function dict", function_dict)
 
-        print("GSPAN INPUT FILE:", self.gspan_text_file)
+        self.dict_of_labels = function_dict
 
+        f = open("gspan_represent_" + file_name, "w")
 
+        for line in self.gspan_text_file.split("\n"):
+            f.write(line + "\n")
 
+    def get_dict_of_labels(self):
+        return self.dict_of_labels
 
+    def get_corr_solutions(self):
+        return self.list_of_correct_solutions
 
+    def get_wrong_solutions(self):
+        return self.list_of_wrong_solutions
 
 class GSpanRepresent():
     def __init__(self, py_folder):
@@ -257,11 +262,9 @@ class DotViozFromFp():
         self.list_of_corr_solutions = list()
         self.list_of_wrong_solutions = list()
         self.names_of_files_to_delete = []
+        self.dict_of_labels = dict()
 
-        self.window = Tk()
-        self.canvas = Canvas(self.window, background="white")
-
-
+        """
         hbar=Scrollbar(self.window,orient=HORIZONTAL)
         hbar.pack(side=BOTTOM,fill=X)
 
@@ -273,6 +276,10 @@ class DotViozFromFp():
 
         vbar.config(command=self.canvas.yview)
         self.canvas.config(yscrollcommand=vbar.set)
+        """
+
+    def set_dict_of_labels(self, dict_of_labels):
+        self.dict_of_labels = dict_of_labels
 
     def set_corr_solutions(self, list_of_indexes_of_correct_solutions):
         "start and end index of correct solutions"
@@ -326,54 +333,44 @@ class DotViozFromFp():
                     subgraphs_temp.append((code, corr_rat, wrong_rat))
                     break
 
-        print(len(subgraphs_temp), subgraphs_temp)
+        #print(len(subgraphs_temp), subgraphs_temp)
 
+        print("subgraphs_temp", subgraphs_temp)
         return subgraphs_temp
 
     def from_gspan_to_dotviz(self, code):
-        edge_temp_text = ""
-        edge_graphs = []
-        vertex_graphs = []
-        vertex_temp_text = ""
-        file_name = "graphviz_input"
-        file_number = 0
-        construct_names = ("def", "if", "for", "while", "return", "f_call")
-        list_of_dotviz_graphs = list()
+        dict_of_vertexes_func = dict()
+        list_of_edges = list()
+        dotviz_code = ""
+        spaces = "    "
+        v1_label = ""
+        v2_label = ""
 
         for line in code.split("\n"):
-            if line and line[0] == "e":
-                edge_temp_text += line + "\n"
-            elif line and line[0] == "v":
-                vertex_temp_text += line + "\n"
+            if line and line[0] == "v":
+                _, vertex, label = line.split(" ")
+                dict_of_vertexes_func[vertex] = label
+            elif line and line[0] == "e":
+                _, v1, v2, _ = line.split(" ")
+                list_of_edges.append((v1, v2))
 
-        temp_text = "digraph G {\n"
-        spaces = "    "
-        vertex_names = ["" for e in vertex_temp_text.split("\n")]
-        vertex_names.pop()
+        dotviz_code = "digraph G {\n"
 
-        for line in vertex_temp_text.split("\n"):
-            if line:
-                label, v1, v2 = line.split()
-                print("label", label, v1, v2)
-                vertex_names[int(v1)] = construct_names[int(v2)]
+        print("self.dict_of_labels:", self.dict_of_labels)
 
-        vertex_names_changed = ["" for e in vertex_names]
+        for v1, v2 in list_of_edges:
 
-        for i, keyword in enumerate(vertex_names):
-            if vertex_names.count(keyword) != 1:
-                vertex_names_changed[i] = vertex_names[i] + str(vertex_names[:i].count(keyword))
-            else:
-                vertex_names_changed[i] = vertex_names[i]
+            for key, value in self.dict_of_labels.items():
+                if int(value) == int(dict_of_vertexes_func[v1]):
+                    v1_label = key
 
-        vertex_names = vertex_names_changed
+                if int(value) == int(dict_of_vertexes_func[v2]):
+                    v2_label = key
 
-        for line in edge_temp_text.split("\n"):
-            if line:
-                label1, v1, v2, label2 = line.split()
-                temp_text += spaces + vertex_names[int(v1)] + " -> " + vertex_names[int(v2)] + ";\n"
+            dotviz_code += spaces + v1_label + " -> " + v2_label + "\n"
 
-        temp_text += "}"
-        return temp_text
+        dotviz_code += "}"
+        return dotviz_code
 
     def make_list_of_dotviz_representations_from_gspan_graphs(self, subgraphs):
         self.temp_subgraphs = []
@@ -384,10 +381,13 @@ class DotViozFromFp():
     def make_pictures_from_list_of_dotviz_rep(self):
         counter = 0
 
+        print("temp self subgraphs", self.temp_subgraphs)
+
         for code, corr_ratio, wrong_ratio in self.temp_subgraphs:
             f = open("temp_file.dot", "w")
             f.write(code)
             f.close()
+            print("HAPPENS?")
             call(['dot','-Tpng',"temp_file.dot",'-o','OutputFilef'+str(counter)+'.gif'], shell=True)
             self.names_of_files_to_delete.append('OutputFilef'+str(counter)+'.gif')
             counter += 1
@@ -401,9 +401,6 @@ class DotViozFromFp():
         print("done with deleting pictures")
 
     def show_pictures(self):
-        self.imageList = []  # Store images for cards
-        self.labelList = []
-        self.picture_set = []
         x = 0
         y = 0
         max_height = 0
@@ -414,13 +411,31 @@ class DotViozFromFp():
 
         screen_width_list = []
         screen_height_list = []
+        picture_set = []
         screen_height = 0
         cnt = -1
 
+        window = Tk()
+        canvas = Canvas(window, background="white")
+
+        hbar=Scrollbar(window,orient=HORIZONTAL)
+        hbar.pack(side=BOTTOM,fill=X)
+
+        hbar.config(command=canvas.xview)
+        canvas.config(xscrollcommand=hbar.set)
+
+        vbar=Scrollbar(window,orient=VERTICAL)
+        vbar.pack(side=RIGHT,fill=Y)
+
+        vbar.config(command=canvas.yview)
+        canvas.config(yscrollcommand=vbar.set)
+
         for file in os.listdir(os.curdir):
             if file[-4:] == ".gif":
-                self.picture_set.append(PhotoImage(file = file))
-                self.canvas.create_image(x, y, image = self.picture_set[-1], anchor=NW)
+
+                picture_set.append(PhotoImage(file = file))
+
+                canvas.create_image(x, y, image = picture_set[-1], anchor=NW)
 
                 num_corr, all_corr = self.temp_subgraphs[cnt][1]
                 num_wrong, all_wrong = self.temp_subgraphs[cnt][2]
@@ -438,12 +453,13 @@ class DotViozFromFp():
 
                 cnt += 1
 
-                self.canvas.create_text(x + self.picture_set[-1].width()/2, y + self.picture_set[-1].height() + y_offset, text=text_corr, anchor = CENTER)
-                self.canvas.create_text(x + self.picture_set[-1].width()/2, y + self.picture_set[-1].height() + 2*y_offset, text=text_wrong, anchor = CENTER)
-                x += self.picture_set[-1].width() + x_offset
+                canvas.create_text(x + picture_set[-1].width()/2, y + picture_set[-1].height() + y_offset, text=text_corr, anchor = CENTER)
+                canvas.create_text(x + picture_set[-1].width()/2, y + picture_set[-1].height() + 2*y_offset, text=text_wrong, anchor = CENTER)
+                x += picture_set[-1].width() + x_offset
 
-                if max_height < self.picture_set[-1].height():
-                    max_height = self.picture_set[-1].height()
+                if max_height < picture_set[-1].height():
+                    max_height = picture_set[-1].height()
+                    screen_width_list.append(max_height)
                 counter += 1
 
                 if counter == 5:
@@ -454,10 +470,80 @@ class DotViozFromFp():
                     screen_height += y
                     print("trenutna izračunana višina:", screen_height)
                     max_height = 0
+
+        if counter != 5:
+            screen_height += max_height + 4*y_offset
+
+
+
+        canvas.pack()
+        window.mainloop()
+
+    def show_pictures_old(self):
+        self.imageList = []
+        self.labelList = []
+        picture_set = []
+        x = 0
+        y = 0
+        max_height = 0
+        x_offset = 20
+        y_offset = 20
+        counter = 0
+        pictures_size = 0
+
+        screen_width_list = []
+        screen_height_list = []
+        screen_height = 0
+        cnt = -1
+
+        for file in os.listdir(os.curdir):
+            if file[-4:] == ".gif":
+
+                picture_set.append(PhotoImage(file = file))
+
+                print(picture_set)
+                self.canvas.create_image(x, y, image = picture_set[-1], anchor=NW)
+
+                num_corr, all_corr = self.temp_subgraphs[cnt][1]
+                num_wrong, all_wrong = self.temp_subgraphs[cnt][2]
+
+                if all_corr == 0:
+                    text_corr = "P: 0/0 0%"
+                else:
+                    #print("a to se ne prav izračuna:", num_corr, all_corr, num_corr / all_corr)
+                    text_corr = "P: " + str(num_corr) + "/" + str(all_corr) + " " + str(num_corr/all_corr*100) + "%"
+
+                if all_wrong == 0:
+                    text_wrong = "N: 0/0 0%"
+                else:
+                    text_wrong = "N: " + str(num_wrong) + "/" + str(all_wrong) + " " + str(num_wrong/all_wrong*100) + "%"
+
+                cnt += 1
+
+                self.canvas.create_text(x + picture_set[-1].width()/2, y + picture_set[-1].height() + y_offset, text=text_corr, anchor = CENTER)
+                self.canvas.create_text(x + picture_set[-1].width()/2, y + picture_set[-1].height() + 2*y_offset, text=text_wrong, anchor = CENTER)
+                x += picture_set[-1].width() + x_offset
+
+                if max_height < picture_set[-1].height():
+                    max_height = picture_set[-1].height()
+                    screen_width_list.append(max_height)
+                counter += 1
+
+                if counter == 5:
+                    screen_width_list.append(x)
+                    counter = 0
+                    x = 0
+                    y += max_height + 4*y_offset
+                    screen_height += y
+                    print("trenutna izračunana višina:", screen_height)
+                    max_height = 0
+
         if counter != 5:
             screen_height += max_height + 4*y_offset
 
         print("to je višina canvasa, ki se nastavi:", screen_height)
+
+        print("screen_width_list:", screen_width_list)
 
         self.canvas.config(width = max(screen_width_list), height = y)
 
@@ -468,18 +554,17 @@ class DotViozFromFp():
 
         self.window.mainloop()
 
-#make
+#make file for gSpan analysis
 a = MakeGSpanInputFile("test")
-a.make_gspan_input_file()
-#a.make_file("analiza")
+a.make_gspan_input_file("analiza1")
 
-#from .fp file from gSpan to pydot representation of subgraphs
-#dot_viz_handler = DotViozFromFp()
-
-#dot_viz_handler.set_corr_solutions(a.get_list_of_corr_solutions())
-#dot_viz_handler.set_wrong_solutions(a.get_list_of_wrong_solutions())
-#dot_viz_handler.make_list_of_dotviz_representations_from_gspan_graphs(dot_viz_handler.make_list_of_codes("gspan_represent_analiza.fp"))
+#from .fp file to dotvit representation of subgraphs
+dot_viz_handler = DotViozFromFp()
+dot_viz_handler.set_dict_of_labels(a.get_dict_of_labels())
+dot_viz_handler.set_corr_solutions(a.get_corr_solutions())
+dot_viz_handler.set_wrong_solutions(a.get_wrong_solutions())
+dot_viz_handler.make_list_of_dotviz_representations_from_gspan_graphs(dot_viz_handler.make_list_of_codes("gspan_represent_analiza1.fp"))
 
 #visualization of subgraphs
-#dot_viz_handler.make_pictures_from_list_of_dotviz_rep()
-#dot_viz_handler.show_pictures()
+dot_viz_handler.make_pictures_from_list_of_dotviz_rep()
+dot_viz_handler.show_pictures()
