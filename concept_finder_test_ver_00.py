@@ -416,7 +416,7 @@ class DotViozFromFp():
         cnt = -1
 
         window = Tk()
-        canvas = Canvas(window, background="white")
+        canvas = Canvas(window, background="red")
 
         hbar=Scrollbar(window,orient=HORIZONTAL)
         hbar.pack(side=BOTTOM,fill=X)
